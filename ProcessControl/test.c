@@ -20,6 +20,61 @@ int add_to_top(int top)
 
 }
 
+#define TASK_NUM 10
+
+// 预设一批任务
+void sync_disk()
+{
+    printf("这是一个刷新数据的任务!\n");
+}
+
+void sync_log()
+{
+    printf("这是一个同步日志的任务!\n");
+}
+
+void net_send()
+{
+    printf("这是一个进行网络发送的任务!\n");
+}
+
+
+// 要保存的任务相关的
+typedef void (*func_t)(); 
+func_t other_task[TASK_NUM] = {NULL};  //函数指针数组
+
+int LoadTask(func_t func)
+{
+    int i = 0;
+    for(; i < TASK_NUM; i++){
+        if(other_task[i] == NULL) break;
+    }
+    if(i == TASK_NUM) return -1;
+    else other_task[i] = func;
+
+    return 0;
+}
+
+void InitTask()
+{
+    for(int i = 0; i < TASK_NUM; i++) other_task[i] = NULL;
+    LoadTask(sync_disk);
+    LoadTask(sync_log);
+    LoadTask(net_send);
+}
+
+void RunTask()
+{
+    for(int i = 0; i < TASK_NUM; i++)
+    {
+        if(other_task[i] == NULL) continue;
+        other_task[i]();
+    }
+}
+
+
+
+
 int main()
 {
     pid_t id = fork();
@@ -37,7 +92,8 @@ int main()
         if(1==1) exit(0);
         exit(100);
     }
-
+    
+    InitTask();
     // 父进程
     //pid_t ret_id = wait(NULL);
     while(1)
@@ -51,12 +107,21 @@ int main()
         }
         else if(ret_id == 0) // 子进程还在运行 
         {
-            printf("子进程还在运行，我做自己其他的事情！\n");
+            RunTask();
+            //printf("子进程还在运行，我做自己其他的事情！\n");
             sleep(1);
             continue;
         }
         else{  
-           printf("我是父进程，等待子进程成功, pid: %d, ppid: %d, ret_id: %d, child exit code: %d,child exit signal: %d\n",getpid(), getppid(), ret_id, (status>>8)&0xFF, status & 0x7F);
+           if(WIFEXITED(status)) // 是否收到信号
+            {
+                printf("wait success, child exit code: %d\n", WEXITSTATUS(status));
+            }
+            else
+            {
+                printf("wait success, child exit signal: %d\n", status & 0x7F);
+            }
+          //.out printf("我是父进程，等待子进程成功, pid: %d, ppid: %d, ret_id: %d, child exit code: %d,child exit signal: %d\n",getpid(), getppid(), ret_id, (status>>8)&0xFF, status & 0x7F);
             break;
         }
     }
