@@ -1,0 +1,6 @@
+test fprintf->stderr
+test fprintf->stderr
+test fprintf->stderr
+test fprintf->stderr
+test fprintf->stderr
+test fprintf->stderr

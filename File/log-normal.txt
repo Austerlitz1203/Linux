@@ -1,0 +1,14 @@
+test printf->stdout
+test printf->stdout
+test printf->stdout
+test printf->stdout
+test printf->stdout
+test printf->stdout
+test fprintf->stdout
+test fprintf->stdout
+test fprintf->stdout
+test fprintf->stdout
+test fprintf->stdout
+test fprintf->stdout
+This is a test for dup2()
+This is a test for dup2()
