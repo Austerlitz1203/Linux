@@ -149,18 +149,64 @@ void test3()
 
     pthread_cancel(tid);
 
-    
+
     void* ret=nullptr;
     pthread_join(tid,&ret);
     cout<<"new thread exit："<<(int64_t)ret<<" quit thread："<<tid<<endl;
 }
 
 
+int tickets=10000;//票数
+pthread_mutex_t mutex;
+
+void* thread_run4(void* args)
+{
+    string name=static_cast<const char*>(args);
+    while(true)
+    {
+        pthread_mutex_lock(&mutex);
+        if(tickets>0)
+        {
+            usleep(2000);
+            cout<<name<<" get a ticket："<<tickets--<<endl;
+            pthread_mutex_unlock(&mutex);
+        }
+        else
+        {
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
+        usleep(1000); // 抢完一张票的后续动作
+    }
+    return nullptr;
+}
+
+
+void test4()
+{
+    pthread_mutex_init(&mutex,nullptr);
+    pthread_t t[4];
+    for(int i=0;i<4;i++)
+    {
+        char* data=new char[64];
+        snprintf(data,64,"thread-%d",i+1);
+        pthread_create(t+i,nullptr,thread_run4,data);
+    }
+
+
+    for(int i=0;i<4;i++)
+    {
+        pthread_join(t[i],nullptr);
+    }
+
+    return;
+}
 
 int main()
 {
     //test1(); // 线程控制
     //test2(); // 传入类的指针
-    test3();
+    //test3();
+    test4();// 加锁
     return 0;
 }
