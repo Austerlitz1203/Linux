@@ -34,7 +34,7 @@ public:
     void push(const T& in)
     {
         pthread_mutex_lock(&_mutex);
-        if(isFull())
+        while(isFull())
         {
             pthread_cond_wait(&_productCond,&_mutex);
         }
@@ -47,7 +47,7 @@ public:
     void pop(T* out)
     {
         pthread_mutex_lock(&_mutex);
-        if(isEmpty())
+        while(isEmpty())
         {
             pthread_cond_wait(&_consumerCond,&_mutex);
         }
