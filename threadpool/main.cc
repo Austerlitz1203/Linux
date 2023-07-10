@@ -1,5 +1,5 @@
 #include "Task.hpp"
-#include "ThreadPool.hpp"
+#include "ThreadPool_V2.hpp"
 #include <memory>
 #include <time.h>
 
@@ -8,8 +8,8 @@ const char *op = "+-*/%";
 int main()
 {
     std::unique_ptr<ThreadPool<Task>> up(new ThreadPool<Task>(20));
-    up->start();
-
+    up->init();
+    up->run();
     // srand(time(nullptr));
     //  while(true)
     //  {
@@ -39,6 +39,6 @@ int main()
         Task t(x, y, op);
 
         up->pushTask(t);
-    }
+    } 
     return 0;
 }
