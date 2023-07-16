@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include<functional>
 #include <sys/types.h> /* See NOTES */
 #include <sys/socket.h>
 #include <string.h>
@@ -12,12 +13,13 @@ namespace us_server
 {
 
     const static u_int16_t defaultport = 8080;
+    using func_t = std::function<string(string)>;
 
     class UdpServer
     {
     public:
-        UdpServer(const std::string ip, const uint16_t port = defaultport)
-            : ip_(ip), port_(port)
+        UdpServer(func_t f,const uint16_t port = defaultport)
+            : port_(port), service_(f)
         {
         }
 
@@ -64,14 +66,17 @@ namespace us_server
                 else
                     continue;
 
+                // 对消息进行处理
+                string response = service_(buffer);
+
                 // 提取client信息 -- debug
                 std::string clientip = inet_ntoa(peer.sin_addr);
                 uint16_t clientport = ntohs(peer.sin_port);
-                std::cout << clientip << "-" << clientport << "# " << buffer << std::endl;
+                std::cout << clientip << "-" << clientport << "# " << endl <<response << std::endl;
 
 
                 //发
-                sendto(sock_, buffer, sizeof(buffer) -1, 0, (struct sockaddr *)&(peer), sizeof(peer));
+                sendto(sock_, response.c_str(), response.size(), 0, (struct sockaddr *)&(peer), sizeof(peer));
             }
         }
 
@@ -82,6 +87,7 @@ namespace us_server
     private:
         int sock_;
         uint16_t port_;
-        std::string ip_;
+        func_t service_;
+        //string ip_;
     };
 }
