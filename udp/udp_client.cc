@@ -26,7 +26,7 @@ int main(int argc,char* argv[])
         exit(SOCKET_ERR);
     }
 
-
+    // 知道 server 是谁
     struct sockaddr_in server;
     memset(&server,0,sizeof(server));
     server.sin_family=AF_INET;
@@ -45,7 +45,7 @@ int main(int argc,char* argv[])
         sendto(sock,message.c_str(),message.size(),0,(const sockaddr*)&server,sizeof(server));
 
         // 接收
-        char buffer[1024];
+        char buffer[2048];
         struct sockaddr_in temp;
         socklen_t len=sizeof(temp);
         int n=recvfrom(sock,buffer,sizeof(buffer)-1,0,(struct sockaddr*)&temp,&len);

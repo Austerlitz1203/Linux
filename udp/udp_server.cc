@@ -87,9 +87,9 @@ int main(int argc,char* argv[])
     // us.InitServer();
     // us.StartServer();
 
-    unique_ptr<us_server::UdpServer> us(new us_server::UdpServer(excuteCommand,port));
-    us->InitServer();
-    us->StartServer();
+    unique_ptr<us_server::UdpServer> us(new us_server::UdpServer(port));
+    us->Start();
+
 
     return 0;
 }
