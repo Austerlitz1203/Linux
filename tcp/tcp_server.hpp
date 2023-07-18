@@ -2,9 +2,11 @@
 
 #include"err.hpp"
 
+
 #include<iostream>
 #include<string>
 #include <sys/types.h> /* See NOTES */
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -64,6 +66,8 @@ namespace ns_server
 
         void start()
         {
+            //signal(SIGCHLD,SIG_IGN);
+
             quit_=false;
             while(!quit_)
             {
@@ -83,8 +87,31 @@ namespace ns_server
                 // 5. 开始业务处理
                 cout<<"获取新连接成功："<<sock<<"from"<<listensock_<<\
                   ","<<clientip<<" - "<<clientport<<endl;
+                // Version 1
+                //service(sock,clientip,clientport);
 
-                service(sock,clientip,clientport);
+                // version2 多进程  父进程只负责建立好连接，子进程来处理
+                pid_t id=fork();
+                if(id < 0)
+                {
+                    close(sock);
+                    continue;
+                }
+                else if(id == 0) // 子进程
+                {
+                    // 子进程只需要处理，所以可以关闭不需要的 fd
+                    close(listensock_);
+                    if(fork() > 0) exit(0);  // 这一行代码解决阻塞等待的问题，子进程退出，孙子进程执行，所以父进程很快就可以等待到
+
+                    // 孙子进程在执行后面的代码（孤儿进程，被系统领养）
+                    service(sock,clientip,clientport);
+                    exit(0);
+                }
+                // 父进程一定要关闭不需要的 fd
+                close(sock);
+                pid_t ret = waitpid(id, nullptr, 0);  // 阻塞等待，需要进行优化，WAINOHANG并不推荐，没有新连接就无法走到 waitpid 这里
+                if (ret == id)
+                    std::cout << "wait child " << id << " success" << std::endl;
             }
 
         }
