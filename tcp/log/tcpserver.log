@@ -1,0 +1,24 @@
+[Info] [2023-7-19 18:11:44] [7940]create socket success, code: 0, error string: Success
+[Info] [2023-7-19 18:11:44] [7940]bind socket success, code: 0, error string: Success
+[Fatal] [2023-7-19 18:11:44] [7940]listen socket error, code: 0, error string: Success
+[Info] [2023-7-19 18:11:49] [7940]获取新连接成功: 4 from 3, who: 127.0.0.1 - 37270
+[Debug] [2023-7-19 18:11:50] [7940]127.0.0.1-37270# woshishe
+[Info] [2023-7-19 18:14:24] [7998]create socket success, code: 0, error string: Success
+[Info] [2023-7-19 18:14:24] [7998]bind socket success, code: 0, error string: Success
+[Fatal] [2023-7-19 18:14:24] [7998]listen socket error, code: 0, error string: Success
+[Info] [2023-7-19 18:14:31] [7998]获取新连接成功: 4 from 3, who: 127.0.0.1 - 37298
+[Info] [2023-7-19 18:21:18] [8191]create socket success, code: 0, error string: Success
+[Info] [2023-7-19 18:21:18] [8191]bind socket success, code: 0, error string: Success
+[Fatal] [2023-7-19 18:21:18] [8191]listen socket error, code: 0, error string: Success
+[Info] [2023-7-19 18:21:21] [8191]获取新连接成功: 4 from 3, who: 127.0.0.1 - 37372
+[Info] [2023-7-19 18:21:34] [8191]获取新连接成功: 5 from 3, who: 127.0.0.1 - 37376
+[Info] [2023-7-19 18:55:4] [9111]create socket success, code: 0, error string: Success
+[Info] [2023-7-19 18:55:4] [9111]bind socket success, code: 0, error string: Success
+[Fatal] [2023-7-19 18:55:4] [9111]listen socket error, code: 0, error string: Success
+[Info] [2023-7-19 18:55:43] [9112]获取新连接成功: 4 from 3, who: 127.0.0.1 - 37728
+[Debug] [2023-7-19 18:55:43] [9112]线程池单例形成
+[Debug] [2023-7-19 18:55:43] [9112]0 thread running
+[Debug] [2023-7-19 18:55:43] [9112]1 thread running
+[Debug] [2023-7-19 18:55:43] [9112]2 thread running
+[Debug] [2023-7-19 18:55:43] [9112]3 thread running
+[Debug] [2023-7-19 18:55:43] [9112]4 thread running

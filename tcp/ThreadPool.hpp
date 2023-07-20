@@ -1,6 +1,8 @@
 #include "Task.hpp"
 #include "Thread.hpp"
 #include "LockGuard.hpp"
+#include"Log.hpp"
+
 #include <vector>
 #include <queue>
 
@@ -28,6 +30,7 @@ public:
             LockGuard lockguard(&instance_lock); // static修饰，同时没有传入对象，只能重新用一把 static 修饰的锁
             if (instance == nullptr) // 防止多次 new
             {
+                logMessage(Debug, "线程池单例形成");
                 instance = new ThreadPool<T>();
                 instance->init();
                 instance->run();
@@ -96,6 +99,7 @@ public:
         for (int i = 0; i < _num; i++)
         {
             _threads.push_back(Thread(i, threadRountine, this));
+            logMessage(Debug, "%d thread running", i);
         }
     }
 

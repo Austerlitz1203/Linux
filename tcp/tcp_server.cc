@@ -1,4 +1,6 @@
 #include"tcp_server.hpp"
+#include"daemon.hpp"
+
 #include<memory>
 
 using namespace std;
@@ -26,6 +28,7 @@ int main(int argc,char* argv[])
     std::unique_ptr<TcpServer> ts(new TcpServer(echo,port));
 
     ts->InitServer();
+    Daemon(); // 服务器守护进程化
     ts->start();
 
     return 0;

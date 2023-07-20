@@ -3,6 +3,8 @@
 #include "err.hpp"
 #include "ThreadPool.hpp"
 #include "Task.hpp"
+#include "Log.hpp"
+
 #include <iostream>
 #include <string>
 #include <sys/types.h> /* See NOTES */
@@ -50,10 +52,12 @@ namespace ns_server
             listensock_ = socket(AF_INET, SOCK_STREAM, 0);
             if (listensock_ < 0)
             {
-                cerr << "create socket error" << strerror(errno) << endl;
+                // cerr << "create socket error" << strerror(errno) << endl;
+                logMessage(Fatal, "create socket error, code: %d, error string: %s", errno, strerror(errno));
                 exit(SOCKET_ERR);
             }
-            cout << "create socket success:" << listensock_ << endl;
+            //cout << "create socket success:" << listensock_ << endl;
+            logMessage(Info, "create socket success, code: %d, error string: %s", errno, strerror(errno));
 
             // 2. bind
             struct sockaddr_in local;
@@ -64,18 +68,20 @@ namespace ns_server
 
             if (bind(listensock_, (struct sockaddr *)&local, sizeof(local)) < 0)
             {
-                cerr << "bind error " << strerror(errno) << endl;
+                //cerr << "bind error " << strerror(errno) << endl;
+                logMessage(Fatal, "bind socket error, code: %d, error string: %s", errno, strerror(errno));
                 exit(BIND_ERR);
             }
-            cout << "bind success" << endl;
+            //cout << "bind success" << endl;
+            logMessage(Info, "bind socket success, code: %d, error string: %s", errno, strerror(errno));
 
             // 3. lsiten
             if (listen(listensock_, backlog) < 0)
             {
-                cerr << "listen error " << strerror(errno) << endl;
+                logMessage(Fatal, "listen socket error, code: %d, error string: %s", errno, strerror(errno));
                 exit(LISTEN_ERR);
             }
-            cout << "listen success" << endl;
+            logMessage(Fatal, "listen socket error, code: %d, error string: %s", errno, strerror(errno));
         }
 
         void start()
@@ -91,7 +97,8 @@ namespace ns_server
                 int sock = accept(listensock_, (struct sockaddr *)&client, &len);
                 if (sock < 0)
                 {
-                    cerr << "accept error " << strerror(errno) << endl;
+                    //cerr << "accept error " << strerror(errno) << endl;
+                    logMessage(Warning, "accept error, code: %d, error string: %s", errno, strerror(errno));
                     exit(ACCEPT_ERR);
                 }
 
@@ -99,7 +106,8 @@ namespace ns_server
                 uint16_t clientport = ntohs(client.sin_port);
 
                 // 5. 开始业务处理
-                cout << "获取新连接成功：" << sock << "from" << listensock_ << "," << clientip << " - " << clientport << endl;
+                logMessage(Info, "获取新连接成功: %d from %d, who: %s - %d",
+                           sock, listensock_, clientip.c_str(), clientport);
                 // Version 1
                 // service(sock,clientip,clientport);
 
@@ -160,17 +168,17 @@ namespace ns_server
                 string response = func_(buffer);
                 cout << name << ":" << response << endl;
 
-                write(sock, response.c_str(), response.size() );
+                write(sock, response.c_str(), response.size());
             }
             else if (n == 0) // 对方关闭连接
             {
                 close(sock);
-                cout << name << " quit,me too" << endl;
+                logMessage(Info, "%s quit,me too", name.c_str());
             }
             else if (n < 0)
             {
                 close(sock);
-                cerr << "read error" << strerror(errno) << endl;
+                logMessage(Error, "read error, %d:%s", errno, strerror(errno));
             }
 
             close(sock);
