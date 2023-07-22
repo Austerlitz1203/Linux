@@ -86,6 +86,11 @@ public:
         return _sock;
     }
 
+    void Close()
+    {
+        close(_sock);
+    }
+
     ~Sock()
     {
     }

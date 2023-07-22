@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <cstring>
+
+
 #include "Util.hpp"
 
 // 给网络版本计算机定制协议
@@ -21,15 +23,63 @@ namespace protocol_ns
     // "10 + 20" => "7"\r\n""10 + 20"\r\n
     string AddHeader(const string &str)
     {
+        cout << "AddHeader 之前:\n"
+                  << str << std::endl;
         string s = std::to_string(str.size());
         s += HEADER_SEP;
         s += str;
         s += HEADER_SEP;
+
+        cout << "AddHeader 之后:\n"
+                  << s << std::endl;
+
+        return s;
     }
     // "7"\r\n""10 + 20"\r\n => "10 + 20"
-    string RemoveHeader(const string &str)
+    string RemoveHeader(const string &str,int len)
     {
-        
+        cout << "RemoveHeader 之前:\n"
+                  << str << endl;
+
+        string res = str.substr(str.size() - HEADER_SEP_LEN - len, len);
+
+        cout << "RemoveHeader 之后:\n"
+                  << res << endl;
+
+        return res;
+    }
+
+    int ReadPackage(int sock, string &inbuffer, string *package)
+    {
+        cout << "ReadPackage inbuffer 之前:\n"
+                  << inbuffer << endl;
+
+        // 边读取
+        char buffer[1024];
+        ssize_t s = recv(sock, buffer, sizeof(buffer) - 1,0);
+        if(s <= 0) return -1;
+        buffer[s] = 0;
+        inbuffer += buffer;
+
+        cout << "ReadPackage inbuffer 之中:\n"
+                  << inbuffer << endl;
+
+        // 边分析， "7"\r\n""10 + 20"\r\n
+        auto pos = inbuffer.find(HEADER_SEP);
+        if (pos == string::npos)
+            return 0;                                                    // inbuffer什么都没有动
+        string lenStr = inbuffer.substr(0, pos);                    // 获取了头部字符串, inbuffer什么都没有动
+        int len = Util::toInt(lenStr);                                   // "123" -> 123 inbuffer什么都没有动
+        int targetPackageLen = lenStr.size() + len + 2 * HEADER_SEP_LEN; // inbuffer什么都没有动
+        if (inbuffer.size() < targetPackageLen)
+            return 0;                                    // inbuffer什么都没有动
+        *package = inbuffer.substr(0, targetPackageLen); // 提取到了报文有效载荷，inbuffer可什么都没有动
+        inbuffer.erase(0, targetPackageLen);             // 从inbuffer中直接移除整个报文
+
+        std::cout << "ReadPackage inbuffer 之后:\n"
+                  << inbuffer << std::endl;
+
+        return len;
     }
 
     // Request && Response都要提供序列化和反序列化功能
