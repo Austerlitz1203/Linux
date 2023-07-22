@@ -4,9 +4,11 @@
 #include <string>
 #include <vector>
 #include <cstring>
-
+#include <jsoncpp/json/json.h>
 
 #include "Util.hpp"
+
+// #define MYSELF 1
 
 // 给网络版本计算机定制协议
 namespace protocol_ns
@@ -24,27 +26,27 @@ namespace protocol_ns
     string AddHeader(const string &str)
     {
         cout << "AddHeader 之前:\n"
-                  << str << std::endl;
+             << str << std::endl;
         string s = std::to_string(str.size());
         s += HEADER_SEP;
         s += str;
         s += HEADER_SEP;
 
         cout << "AddHeader 之后:\n"
-                  << s << std::endl;
+             << s << std::endl;
 
         return s;
     }
     // "7"\r\n""10 + 20"\r\n => "10 + 20"
-    string RemoveHeader(const string &str,int len)
+    string RemoveHeader(const string &str, int len)
     {
         cout << "RemoveHeader 之前:\n"
-                  << str << endl;
+             << str << endl;
 
         string res = str.substr(str.size() - HEADER_SEP_LEN - len, len);
 
         cout << "RemoveHeader 之后:\n"
-                  << res << endl;
+             << res << endl;
 
         return res;
     }
@@ -52,23 +54,24 @@ namespace protocol_ns
     int ReadPackage(int sock, string &inbuffer, string *package)
     {
         cout << "ReadPackage inbuffer 之前:\n"
-                  << inbuffer << endl;
+             << inbuffer << endl;
 
         // 边读取
         char buffer[1024];
-        ssize_t s = recv(sock, buffer, sizeof(buffer) - 1,0);
-        if(s <= 0) return -1;
+        ssize_t s = recv(sock, buffer, sizeof(buffer) - 1, 0);
+        if (s <= 0)
+            return -1;
         buffer[s] = 0;
         inbuffer += buffer;
 
         cout << "ReadPackage inbuffer 之中:\n"
-                  << inbuffer << endl;
+             << inbuffer << endl;
 
         // 边分析， "7"\r\n""10 + 20"\r\n
         auto pos = inbuffer.find(HEADER_SEP);
         if (pos == string::npos)
             return 0;                                                    // inbuffer什么都没有动
-        string lenStr = inbuffer.substr(0, pos);                    // 获取了头部字符串, inbuffer什么都没有动
+        string lenStr = inbuffer.substr(0, pos);                         // 获取了头部字符串, inbuffer什么都没有动
         int len = Util::toInt(lenStr);                                   // "123" -> 123 inbuffer什么都没有动
         int targetPackageLen = lenStr.size() + len + 2 * HEADER_SEP_LEN; // inbuffer什么都没有动
         if (inbuffer.size() < targetPackageLen)
@@ -98,21 +101,33 @@ namespace protocol_ns
         bool Serialize(string *outStr)
         {
             *outStr = "";
+#ifdef MYSELF
+
             string x_string = std::to_string(_x);
             string y_string = std::to_string(_y);
 
             // 手动序列化
             *outStr = x_string + SEP + _op + SEP + y_string;
+#else
+            Json::Value root; // Value: 一种万能对象, 接受任意的kv类型
 
+            root["x"] = _x;
+            root["y"] = _y;
+            root["op"] = _op;
+            // Json::FastWriter writer; // Writer：是用来进行序列化的 struct -> string
+            Json::StyledWriter writer;
+            *outStr = writer.write(root);
+#endif
             return true;
         }
-
 
         // string->struct
         bool Deserialize(const string &inStr)
         {
             // inStr : 10 + 20 => [0]=>10, [1]=>+, [2]=>20
             // string -> vector
+#ifdef MYSELF
+
             std::vector<string> result;
             Util::StringSplit(inStr, SEP, &result);
             if (result.size() != 3)
@@ -122,6 +137,16 @@ namespace protocol_ns
             _x = Util::toInt(result[0]);
             _y = Util::toInt(result[2]);
             _op = result[1][0];
+#else
+            Json::Value root;
+            Json::Reader reader; // Reader: 用来进行反序列化的
+            reader.parse(inStr, root);
+
+            _x = root["x"].asInt();
+            _y = root["y"].asInt();
+            _op = root["op"].asInt();
+#endif
+            return true;
         }
         ~Request() {}
 
@@ -144,16 +169,28 @@ namespace protocol_ns
         {
             //_result _code
             *outStr = "";
+#ifdef MYSELF
             string res_string = std::to_string(_result);
             string code_string = std::to_string(_code);
 
             *outStr = res_string + SEP + code_string;
+#else
+            Json::Value root;
+            root["result"] = _result;
+            root["code"] = _code;
+
+            // Json::FastWriter writer;
+            Json::StyledWriter writer;
+
+            *outStr = writer.write(root);
+#endif
             return true;
         }
         // string->struct
         bool Deserialize(const string &inStr)
         {
             // 10 0, 10 1
+#ifdef MYSELF
             std::vector<string> result;
             Util::StringSplit(inStr, SEP, &result);
             if (result.size() != 2)
@@ -161,6 +198,13 @@ namespace protocol_ns
 
             _result = Util::toInt(result[0]);
             _code = Util::toInt(result[1]);
+#else
+            Json::Value root;
+            Json::Reader reader;
+            reader.parse(inStr, root);
+            _result = root["result"].asInt();
+            _code = root["code"].asInt();
+#endif
             return true;
         }
         ~Response() {}
