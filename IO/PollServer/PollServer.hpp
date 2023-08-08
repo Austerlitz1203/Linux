@@ -1,32 +1,25 @@
 #pragma once
 
 #include <iostream>
-#include<sys/select.h>
+#include<sys/poll.h>
 #include "Sock.hpp"
 #include "err.hpp"
 
-const static int N = (sizeof(fd_set) * 8);
+const static int N = 4096;
 const static int defaultfd = -1;
 const static int defaultport = 8888;
+const static short defaultevent = 0;
 
-#define READ_EVENT (0x1)
-#define WRITE_EVENT (0x1 << 1)
-#define EXCEPT_EVENT (0x1 << 2)
+typedef struct pollfd type_t;
 
-typedef struct FdEvent
-{
-    int fd;
-    uint8_t event;
-    uint16_t clientport;
-    std::string clientid;
-} type_t;
-
-class SelectServer
+class PollServer
 {
 public:
-    SelectServer(uint16_t port = defaultport)
+    PollServer(uint16_t port = defaultport)
         : port_(port)
+        ,fdarray_(nullptr)
     {
+        fdarray_ = new type_t[N];
     }
 
     void InitServer()
@@ -38,6 +31,8 @@ public:
         for (int i = 0; i < N; i++)
         {
             fdarray_[i].fd = defaultfd;
+            fdarray_[i].events=defaultevent;
+            fdarray_[i].revents=defaultevent;
         }
 
         std::cout << "InitServer done" << std::endl;
@@ -51,32 +46,12 @@ public:
         // listensock_.Accept(); 不能！
 
         fdarray_[0].fd = listensock_.Fd();
+        fdarray_[0].events=POLLIN;
         while (true)
         {
-            // struct timeval timeout = {0, 0};
-            // 因为rfds是一个输入输出型参数，注定了每次都要对rfds进行重置，所以要知道我历史上都有哪些fd?fdarray_[]
-            // 因为服务器在运行中，sockfd的值一直在动态变化，所以maxfd也一定在变化， maxfd也要进行动态更新， fdarray_[]
-            fd_set rfds;
-            fd_set wfds;
-            FD_ZERO(&wfds);
-            FD_ZERO(&rfds);
-            int maxfd = fdarray_[0].fd;
-            // 重置 rfds
-            for (int i = 0; i < N; i++)
-            {
-                if (fdarray_[i] == defaultfd)
-                    continue;
-                // 合法fd
-                if (fdarray_[i].event & READ_EVENT)
-                    FD_SET(fdarray_[i].fd, &rfds);
-                if (fdarray_[i].event & WRITE_EVENT)
-                    FD_SET(fdarray_[i].fd, &wfds);
-
-                if (maxfd < fdarray_[i].fd)
-                    maxfd = fdarray_[i].fd;
-            }
             // select 并根据结果来进行不同的输出
-            int n = select(maxfd + 1, &rfds, &wfds, nullptr, nullptr);
+            int timeout = -1;
+            int n = poll(fdarray_,N,timeout);
             switch (n)
             {
             case 0:
@@ -88,7 +63,7 @@ public:
             default:
                 // 成功了
                 logMessage(Debug, "有一个就绪事件发生了: %d", n);
-                HandlerEvent(rfds, wfds);
+                HandlerEvent();
                 DebugPrint();
                 break;
             }
@@ -108,16 +83,15 @@ public:
         std::cout << "\n";
     }
 
-    ~SelectServer()
+    ~PollServer()
     {
         listensock_.Close();
+        if(fdarray_) delete[] fdarray_;
     }
 
 private:
     void Accepter()
     {
-        // std::cout << "有一个新连接到来了" << std::endl;
-        // 这里在进行Accept不会被阻塞
         std::string clientip;
         uint16_t clientport;
         int sock = listensock_.Accept(&clientip, &clientport);
@@ -126,7 +100,7 @@ private:
         // 得到了对应的sock, 不可以进行read/recv，读取sock
         // 因为sock上不一定有数据就绪。所以需要将sock交给select，让select进行管理！
         logMessage(Debug, "[%s:%d], sock: %d", clientip.c_str(), clientport, sock);
-        // 要让select 帮我们进行关心，只要把sock添加到fdarray_[]里面即可！
+
         int pos = 1;
         for (; pos < N; pos++)
         {
@@ -141,6 +115,8 @@ private:
         else
         {
             fdarray_[pos].fd = sock;
+            fdarray_[pos].events = POLLIN; // 关心读事件
+            fdarray_[pos].revents = defaultevent;
         }
     }
 
@@ -165,30 +141,33 @@ private:
                 logMessage(Info, "client quit ..., fdarray_[i] -> defaultfd: %d->%d", fd, defaultfd);
             else
                 logMessage(Warning, "recv error, client quit ..., fdarray_[i] -> defaultfd: %d->%d", fd, defaultfd);
-            close(fdarray_[i].fd);
+            close(fd);
             fdarray_[i].fd = defaultfd;
+            fdarray_[i].events=defaultevent;
+            fdarray_[i].revents=defaultevent;
         }
     }
 
-    void HandlerEvent(fd_set &rfds, fd_set &wfds)
+    void HandlerEvent()
     {
         for (int i = 0; i < N; i++)
         {
-            if (fdarray_[i].fd == defaultfd)
+            int fd = fdarray_[i].fd;
+            if (fd == defaultfd)
                 continue;
-            if (fdarray_[i].event == READ_EVENT && FD_ISSET(fdarray_[i].fd, &rfds))
+            if (fdarray_[i].revents & POLLIN) // 读事件就绪
             {
                 // _listensock 就绪 并且在rfds中已经被设置为1
-                if ((fdarray_[i] == listensock_.Fd()) && FD_ISSET(listensock_.Fd(), &rfds))
+                if (fd == listensock_.Fd())
                 {
                     Accepter();
                 }
-                else if ((fdarray_[i] != listensock_.Fd()) && FD_ISSET(fdarray_[i], &rfds))
+                else if (fd != listensock_.Fd())
                 { // 非_listensock 就绪，那就是其他的 fd 就绪，有数据，需要读取
                     ServiceIO(i);
                 }
             }
-            else if(fdarray_[i].event == WRITE_EVENT && FD_ISSET(fdarray_[i].fd,&wfds))
+            else if(fdarray_[i].revents & POLLOUT) // 写事件就绪
             {
 
             }
@@ -198,5 +177,5 @@ private:
 private:
     uint16_t port_;
     Sock listensock_;
-    type_t fdarray_[N]; // 管理所有的 fd
+    type_t* fdarray_; // 管理所有的 fd
 };
