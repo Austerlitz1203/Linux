@@ -53,11 +53,12 @@ public:
         }
     }
 
-    int Accept(string *clientip, uint16_t *clientport)
+    int Accept(string *clientip, uint16_t *clientport,int *err)
     {
         struct sockaddr_in temp;
         socklen_t len = sizeof(temp);
         int sock = accept(_sock, (struct sockaddr *)&temp, &len);
+        *err = errno;
         if (sock < 0)
         {
             logMessage(Warning, "accept error, code: %d, errstring: %s", errno, strerror(errno));
