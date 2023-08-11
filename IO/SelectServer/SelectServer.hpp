@@ -64,7 +64,7 @@ public:
             // 重置 rfds
             for (int i = 0; i < N; i++)
             {
-                if (fdarray_[i] == defaultfd)
+                if (fdarray_[i].fd == defaultfd)
                     continue;
                 // 合法fd
                 if (fdarray_[i].event & READ_EVENT)
@@ -179,11 +179,11 @@ private:
             if (fdarray_[i].event == READ_EVENT && FD_ISSET(fdarray_[i].fd, &rfds))
             {
                 // _listensock 就绪 并且在rfds中已经被设置为1
-                if ((fdarray_[i] == listensock_.Fd()) && FD_ISSET(listensock_.Fd(), &rfds))
+                if ((fdarray_[i].fd == listensock_.Fd()) && FD_ISSET(listensock_.Fd(), &rfds))
                 {
                     Accepter();
                 }
-                else if ((fdarray_[i] != listensock_.Fd()) && FD_ISSET(fdarray_[i], &rfds))
+                else if ((fdarray_[i].fd != listensock_.Fd()) && FD_ISSET(fdarray_[i].fd, &rfds))
                 { // 非_listensock 就绪，那就是其他的 fd 就绪，有数据，需要读取
                     ServiceIO(i);
                 }
