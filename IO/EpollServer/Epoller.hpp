@@ -25,12 +25,12 @@ public:
         }
     }
 
-    bool AddEvent(int fd,uint32_t events)
+    bool AddModEvent(int fd,uint32_t events,int op)
     {
         struct epoll_event ev;
         ev.events  = events;
         ev.data.fd=fd;
-        int n = epoll_ctl(epfd_,EPOLL_CTL_ADD,fd,&ev);
+        int n = epoll_ctl(epfd_,op,fd,&ev);
         if( n < 0)
         {
             logMessage(Fatal, "epoll_ctl error, code: %d, errstring: %s", errno, strerror(errno));

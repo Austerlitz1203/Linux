@@ -53,8 +53,6 @@ namespace protocol_ns
 
     int ParsePackage(string &inbuffer, string *package)
     {
-        cout << "ReadPackage inbuffer 之前:\n"
-             << inbuffer << endl;
 
         // 分析， "7"\r\n""10 + 20"\r\n
         auto pos = inbuffer.find(HEADER_SEP);
@@ -67,9 +65,6 @@ namespace protocol_ns
             return 0;                                    // inbuffer什么都没有动
         *package = inbuffer.substr(0, targetPackageLen); // 提取到了报文有效载荷，inbuffer可什么都没有动
         inbuffer.erase(0, targetPackageLen);             // 从inbuffer中直接移除整个报文
-
-        std::cout << "ReadPackage inbuffer 之后:\n"
-                  << inbuffer << std::endl;
 
         return len;
     }

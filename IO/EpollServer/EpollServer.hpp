@@ -12,6 +12,8 @@
 
 static const uint16_t defaultport = 8888;
 static const int bsize = 1024;
+static const int linkTimeout = 30;
+
 class Connection;
 class EpollServer;
 
@@ -54,12 +56,14 @@ public:
 
     // 回指指针
     EpollServer *R_;
+
+    time_t lasttime_; // 这个connection最近一次就绪的时间
 };
 
 class EpollServer
 {
     const static int gnum = 64;
-    using func_t = std::function<void(Connection *, const Request &)>;
+    using func_t = std::function<Response(const Request &)>;
 
 public:
     EpollServer(func_t func, uint16_t port = defaultport)
@@ -85,6 +89,8 @@ public:
         while (true)
         {
             LoopOnce(timeout);
+
+            checkLink();
         }
     }
 
@@ -109,6 +115,7 @@ public:
         }
     }
 
+    // 连接管理器
     void Accepter(Connection *c)
     {
         do
@@ -146,6 +153,8 @@ public:
 
     bool EnableReadWrite(Connection *conn, bool readable, bool writeable)
     {
+        conn->events = ((readable ? EPOLLIN : 0) | (writeable ? EPOLLOUT : 0) | EPOLLET);
+        return epoller_.AddModEvent(conn->fd_, conn->events, EPOLL_CTL_MOD);
     }
 
 private:
@@ -154,8 +163,10 @@ private:
         return connections_.find(fd) != connections_.end();
     }
 
-    void Recver(Connection *conn)
+    // 只进行读取数据的工作
+    bool RecverHelper(Connection* conn)
     {
+        int ret = true;
         do
         {
             char buffer[bsize];
@@ -164,20 +175,11 @@ private:
             {
                 buffer[n] = 0;
                 conn->inbuffer_ += buffer;
-                // 根据基本协议，进行数据分析
-                std::string requestStr;
-                int n = protocol_ns::ParsePackage(conn->inbuffer_, &requestStr);
-                if (n > 0)
-                {
-                    requestStr = protocol_ns::RemoveHeader(requestStr, n);
-                    Request req;
-                    req.Deserialize(requestStr);
-                    func_(conn, req); // request 保证是一个完整的请求报文！
-                }
             }
             else if (n == 0) // 读取结束
             {
                 conn->excepter_(conn);
+                ret = false;
                 break;
             }
             else
@@ -188,22 +190,112 @@ private:
                     continue;
                 else
                 {
+                    ret = false;
                     conn->excepter_(conn);
                     break;
                 }
             }
 
         } while (conn->events & EPOLLET); // 如果是ET模式，循环读取直到缓冲区数据被取完
+
+        return ret;
+    }
+
+    void HandlerRequest(Connection *conn)
+    {
+        int quit = false;
+        while(!quit)
+        {
+            std::string RequestStr;
+            // 1. 提取完整报文
+            int n = protocol_ns::ParsePackage(conn->inbuffer_,&RequestStr);
+            if(n>0) // 是完整的报文
+            {
+                // 2. 提取有效载荷
+                RequestStr = protocol_ns::RemoveHeader(RequestStr,n);
+                // 3. 进行反序列化
+                Request req;
+                req.Deserialize(RequestStr);
+                // 4. 业务处理
+                Response  resp = func_(req);
+                // 5. 序列化
+                std::string ResponseStr;
+                resp.Serialize(&ResponseStr);
+                // 6. 添加报头
+                ResponseStr = AddHeader(ResponseStr);
+
+                // 7. 进行返回
+                conn->outbuffer_ += ResponseStr;
+            }
+            else // 不是完整的报文
+            {
+                quit = true;
+            }
+        }
+    }
+
+    void Recver(Connection *conn)
+    {
+        // 读取不到完整报文，则返回，等待下一次读取到完整报文
+        if(!RecverHelper(conn)) return;
+
+        // 读取完整报文，处理请求
+        HandlerRequest(conn);
+
+        //一般在写入的时候，直接写入，没写完才交给Epoll
+        if(!conn->outbuffer_.empty())
+            conn->sender_(conn); // 第一次触发发送
+
     }
 
     void Sender(Connection *conn)
     {
-        logMessage(Debug, "Sender..., fd: %d, clientinfo: [%s:%d]", conn->fd_, conn->clientip_.c_str(), conn->clientport_);
+        bool safe = true;
+        do
+        {
+            ssize_t n = send(conn->fd_, conn->outbuffer_.c_str(), conn->outbuffer_.size(), 0);
+            if (n > 0)
+            {
+                conn->outbuffer_.erase(0, n);
+                if (conn->outbuffer_.empty())
+                    break;
+            }
+            else
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    break;
+                }
+                else if (errno == EINTR)
+                    continue;
+                else
+                {
+                    safe = false;
+                    conn->excepter_(conn);
+                    break;
+                }
+            }
+        } while (conn->events & EPOLLET);
+
+        if (!safe)
+            return;
+        if (!conn->outbuffer_.empty())
+            EnableReadWrite(conn, true, true);
+        else
+            EnableReadWrite(conn, true, false);
     }
 
     void Excepter(Connection *conn)
     {
-        logMessage(Debug, "Excepter..., fd: %d, clientinfo: [%s:%d]", conn->fd_, conn->clientip_.c_str(), conn->clientport_);
+        // 1. 先从 Epoll 移除fd
+        epoller_.DelEvent(conn->fd_);
+        // 2. 移除 unordered_map 中的KV关系
+        connections_.erase(conn->fd_);
+        // 3. 关闭 fd
+        close(conn->fd_);
+        // 4. 释放conn对象
+        delete conn;
+        logMessage(Debug, "Excepter...done, fd: %d, clientinfo: [%s:%d]", conn->fd_, conn->clientip_.c_str(), conn->clientport_);
     }
 
     void AddConnection(int fd, uint32_t events, std::string clientip = "127.0.0.1", uint16_t clientport = 8888)
@@ -225,9 +317,21 @@ private:
         c->clientip_ = clientip;
         c->clientport_ = clientport;
         c->events = events;
-        bool r = epoller_.AddEvent(fd, events);
+        c->R_ = this;
+        c->lasttime_ = time(nullptr);
+        bool r = epoller_.AddModEvent(fd, events,EPOLL_CTL_ADD);
         assert(r);
         (void)r;
+    }
+
+    void checkLink()
+    {
+        time_t curr = time(nullptr);
+        for(auto &connection : connections_)
+        {
+            if(connection.second->lasttime_ + linkTimeout > curr) continue;
+            else Excepter(connection.second);
+        }
     }
 
 private:
